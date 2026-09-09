@@ -311,7 +311,16 @@ function renderDashboardRecentActivity() {
                     : 'badge-in';
 
         const item = document.createElement('div');
-        item.className = 'activity-item';
+        item.className = 'activity-item activity-item--clickable';
+        item.tabIndex = 0;
+        item.title = 'Open this activity';
+        item.addEventListener('click', () => openDashboardActivity(log));
+        item.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openDashboardActivity(log);
+            }
+        });
         item.innerHTML = `
             <div class="activity-left">
                 <div class="activity-name">${escapeHtml(log.recordName || log.module || 'Inventory Record')}</div>
@@ -325,6 +334,41 @@ function renderDashboardRecentActivity() {
     });
 }
 window.renderDashboardRecentActivity = renderDashboardRecentActivity;
+
+function openDashboardActivity(log) {
+    const pageByModule = {
+        Products: 'products',
+        'Product Stock': 'product-stock',
+        'Stock Record': 'product-stock',
+        'Stock In': 'stock-in',
+        'Stock Out': 'stock-out',
+        Adjustments: 'adjustments'
+    };
+    const page = pageByModule[log?.module] || 'audit-trail';
+    navigateToPage(page);
+
+    const searchByPage = {
+        products: 'products-search',
+        'product-stock': 'stock-search',
+        'stock-in': 'stock-in-search',
+        'stock-out': 'stock-out-search',
+        adjustments: 'adj-search'
+    };
+    const searchId = searchByPage[page];
+    const search = document.getElementById(searchId);
+    if (search && log?.recordId) {
+        search.value = log.recordId;
+        const filterByPage = {
+            products: window.filterProducts,
+            'product-stock': window.filterStock,
+            'stock-in': window.filterStockIn,
+            'stock-out': window.filterStockOut,
+            adjustments: window.filterAdjustments
+        };
+        filterByPage[page]?.();
+    }
+}
+window.openDashboardActivity = openDashboardActivity;
 
 // ---- Shared Status Badge Renderer ----
 if (typeof window.getProductStatusBadge !== 'function') {
