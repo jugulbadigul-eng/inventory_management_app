@@ -3924,58 +3924,37 @@ function loadAuditLogs() {
     try {
         const stored = localStorage.getItem('inventory_audit_logs');
         if (stored) {
-            _auditLogs = JSON.parse(stored);
+            const parsedLogs = JSON.parse(stored);
+            _auditLogs = Array.isArray(parsedLogs)
+                ? parsedLogs.filter(log => !isLegacySeedAuditLog(log))
+                : [];
+            if (_auditLogs.length !== parsedLogs.length) {
+                localStorage.setItem('inventory_audit_logs', JSON.stringify(_auditLogs));
+            }
         } else {
-            _auditLogs = [
-                {
-                    id: 4,
-                    timestamp: 'Aug 15, 2026, 10:30:00 PM',
-                    module: 'Stock In',
-                    action: 'Added',
-                    recordId: '1-11',
-                    recordName: 'Bluetooth Headphones',
-                    details: 'Admin added Stock In record for "Bluetooth Headphones" (ID: 1-11) with Qty In: +120, Price: BND 6,014',
-                    user: 'Admin'
-                },
-                {
-                    id: 3,
-                    timestamp: 'Aug 14, 2026, 04:15:00 PM',
-                    module: 'Stock Out',
-                    action: 'Added',
-                    recordId: '1-12',
-                    recordName: 'Office Desk',
-                    details: 'Admin logged Stock Out for "Office Desk" (ID: 1-12) with Qty Out: -4, Balance: 26',
-                    user: 'Admin'
-                },
-                {
-                    id: 2,
-                    timestamp: 'Aug 12, 2026, 02:00:00 PM',
-                    module: 'Adjustments',
-                    action: 'Edited',
-                    recordId: '1-13',
-                    recordName: 'Stapler',
-                    details: 'Admin updated Adjustment for "Stapler" (ID: 1-13) [New Qty: 45, Diff: +5, Reason: Recount]',
-                    user: 'Admin'
-                },
-                {
-                    id: 1,
-                    timestamp: 'Aug 10, 2026, 09:00:00 AM',
-                    module: 'Product Stock',
-                    action: 'Added',
-                    recordId: '1-14',
-                    recordName: 'A4 Printer Paper',
-                    details: 'Admin created initial record for "A4 Printer Paper" (ID: 1-14)',
-                    user: 'Admin'
-                }
-            ];
-            localStorage.setItem('inventory_audit_logs', JSON.stringify(_auditLogs));
+            _auditLogs = [];
         }
     } catch (e) {
         _auditLogs = [];
     }
     renderAuditLogsTable(_auditLogs);
+    renderDashboardRecentActivity();
 }
 window.loadAuditLogs = loadAuditLogs;
+
+function isLegacySeedAuditLog(log) {
+    const seedRecords = {
+        '1': ['Product Stock', '1-14', 'A4 Printer Paper'],
+        '2': ['Adjustments', '1-13', 'Stapler'],
+        '3': ['Stock Out', '1-12', 'Office Desk'],
+        '4': ['Stock In', '1-11', 'Bluetooth Headphones']
+    };
+    const seed = seedRecords[String(log?.id)];
+    return Boolean(seed
+        && log?.module === seed[0]
+        && log?.recordId === seed[1]
+        && log?.recordName === seed[2]);
+}
 
 function logAudit(action, module, details, recordId = '', recordName = '') {
     const user = getCurrentUser();
@@ -5048,7 +5027,10 @@ async function loadAuditFromDB() {
 
     const { data, error } = await sbSelectAll(AUDIT_TRAIL_TABLE);
     if (error) { console.warn('loadAuditFromDB error:', error); return; }
-    if (!data || data.length === 0) return;
+    if (!data || data.length === 0) {
+        renderDashboardRecentActivity();
+        return;
+    }
 
     // Convert DB rows to the same shape as local audit log entries
     const dbLogs = data.map(row => ({
@@ -5079,5 +5061,6 @@ async function loadAuditFromDB() {
         return (Number.isFinite(dateB) ? dateB : 0) - (Number.isFinite(dateA) ? dateA : 0);
     });
     renderAuditLogsTable(_auditLogs);
+    renderDashboardRecentActivity();
 }
 window.loadAuditFromDB = loadAuditFromDB;
